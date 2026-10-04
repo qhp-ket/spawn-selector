@@ -1,0 +1,110 @@
+{
+  "spawnselector:bobbar": {
+    "name": {
+      "color": "white",
+      "text": "鲍勃酒馆"
+    },
+    "description": [
+      {
+        "color": "yellow",
+        "text": "较推荐。\n"
+      },
+      {
+        "color": "white",
+        "text": "多层中型房屋。大量资源。NPC、友方战斗人员。\n"
+      },
+      {
+        "color": "gold",
+        "bold": true,
+        "text": "友方战斗人员会反击。"
+      }
+    ],
+    "icon": "minecraft:barrel",
+    "dimension": "minecraft:overworld",
+    "locator": "minecraft_structure",
+    "target": "bobsoriginiumdream:bobbar",
+    "required_mod": "bobsoriginiumdream",
+    "order": 15,
+    "enabled": true,
+    "search_radius": 80,
+    "min_distance": 8,
+    "max_distance": 48,
+    "preferred_side": "north",
+    "candidate_count": 3,
+    "capacity_per_instance": -1,
+    "require_open_sky": true,
+    "exclusions": []
+  },
+  "spawnselector:chest_museum": {
+    "name": {
+      "color": "white",
+      "text": "宝箱博物馆"
+    },
+    "description": [
+      {
+        "color": "gold",
+        "text": "慎重。\n"
+      },
+      {
+        "color": "white",
+        "text": "奖励性结构。过量资源。\n"
+      },
+      {
+        "color": "gold",
+        "bold": true,
+        "text": "有陷阱。有反击式敌人。"
+      }
+    ],
+    "icon": "minecraft:chest",
+    "dimension": "minecraft:overworld",
+    "locator": "minecraft_structure",
+    "target": "caerula_arbor:chest_museum",
+    "required_mod": "caerula_arbor",
+    "order": 40,
+    "enabled": true,
+    "search_radius": 100,
+    "min_distance": 16,
+    "max_distance": 64,
+    "preferred_side": "north",
+    "candidate_count": 3,
+    "capacity_per_instance": -1,
+    "require_open_sky": true,
+    "exclusions": []
+  },
+  "spawnselector:cloister": {
+    "name": {
+      "color": "white",
+      "text": "伊比利亚修道院"
+    },
+    "description": [
+      {
+        "color": "yellow",
+        "text": "较推荐。\n"
+      },
+      {
+        "color": "white",
+        "text": "大型结构。大量资源。大量无业村民、复数友方战斗人员。\n"
+      },
+      {
+        "color": "gold",
+        "bold": true,
+        "text": "友方战斗人员会反击。"
+      }
+    ],
+    "icon": "minecraft:lantern",
+    "dimension": "minecraft:overworld",
+    "locator": "minecraft_structure",
+    "target": "caerula_arbor:cloister",
+    "required_mod": "caerula_arbor",
+    "order": 20,
+    "enabled": true,
+    "search_radius": 100,
+    "min_distance": 16,
+    "max_distance": 64,
+    "preferred_side": "north",
+    "candidate_count": 3,
+    "capacity_per_instance": -1,
+    "require_open_sky": true,
+    "exclusions": []
+  }
+}

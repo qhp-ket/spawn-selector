@@ -1,0 +1,244 @@
+plugins {
+    id 'eclipse'
+    id 'idea'
+    id 'net.minecraftforge.gradle' version '6.0.54'
+    id 'org.spongepowered.mixin' version '0.7-SNAPSHOT'
+}
+
+// FG 6 creates this SRG intermediate while resolving the mapped Minecraft dependency.
+// Use FG's cache API, which follows Gradle's actual user home on every platform.
+def forgeSrgArtifact = {
+    def artifact = net.minecraftforge.gradle.common.util.Utils.getCache(project, 'minecraft_user_repo',
+        'net', 'minecraftforge', 'forge', "${minecraft_version}-${forge_version}",
+        "forge-${minecraft_version}-${forge_version}-srg.jar")
+    if (!artifact.isFile()) throw new GradleException('ForgeGradle SRG intermediate missing; resolve the Minecraft compile dependency first')
+    artifact
+}
+def pythonExecutable = providers.gradleProperty('pythonExecutable').orElse(providers.environmentVariable('PYTHON'))
+    .orElse(System.getProperty('os.name').toLowerCase().contains('windows') ? 'python' : 'python3')
+version = mod_version
+group = 'dev.tide.spawnselector'
+base.archivesName = 'spawnselector'
+java.toolchain.languageVersion = JavaLanguageVersion.of(17)
+sourceSets {
+    integration {
+        java.srcDirs = ['tests/world']
+        resources.srcDirs = ['src/test/resources']
+        compileClasspath += sourceSets.main.output + sourceSets.main.compileClasspath
+        runtimeClasspath += sourceSets.main.output + sourceSets.main.runtimeClasspath
+    }
+}
+minecraft {
+    mappings channel: 'official', version: minecraft_version
+    copyIdeResources = true
+    runs {
+        configureEach {
+            workingDirectory project.file('run/common')
+            property 'mixin.env.remapRefMap', 'true'
+            property 'mixin.env.refMapRemappingFile', "${projectDir}/build/createSrgToMcp/output.srg"
+            property 'mixin.debug.export', 'true'
+            mods { spawnselector { source sourceSets.main } }
+        }
+        client {
+            workingDirectory project.file('run/client')
+            if(project.hasProperty('clientRegression')) {
+                property 'spawnselector.clientRegression', project.property('clientRegression')
+                property 'spawnselector.testWorld', project.findProperty('testWorld') ?: 'spawnselector-regression'
+                if(project.property('clientRegression') == 'fixtures') property 'forge.enabledGameTestNamespaces', 'spawnselectortests'
+                args '--username', 'SpawnSelectorTest', '--uuid', '00000000-0000-0000-0000-000000000017'
+                mods { spawnselectortests { source sourceSets.integration } }
+            }
+        }
+        server { workingDirectory project.file('run/server'); args '--nogui' }
+        gameTestServer {
+            workingDirectory project.file('run/gametest')
+            property 'forge.enabledGameTestNamespaces', 'spawnselectortests'
+            mods { spawnselectortests { source sourceSets.integration } }
+        }
+    }
+}
+repositories {
+    mavenCentral()
+    maven { url = 'https://repo.spongepowered.org/repository/maven-public/' }
+    if(project.hasProperty('originsFixture')) flatDir { dirs 'test-mods' }
+}
+jarJar.enable()
+dependencies {
+    minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
+    annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
+    compileOnly(annotationProcessor('io.github.llamalad7:mixinextras-common:0.5.5'))
+    implementation(jarJar('io.github.llamalad7:mixinextras-forge:0.5.5')) {
+        jarJar.ranged(it, '[0.5.5,)')
+    }
+    if(project.hasProperty('originsFixture')) {
+        def fixture=file('test-mods/dependencies.json')
+        if(!fixture.exists()) throw new GradleException('Run tools/prepare_origins_fixture.py with your installed Origins and Caelus jars first')
+        new groovy.json.JsonSlurper().parse(fixture).each { mod ->
+            runtimeOnly fg.deobf("spawnselector.test:${mod}:local")
+        }
+    }
+}
+mixin {
+    add sourceSets.main, 'spawnselector.refmap.json'
+    config 'spawnselector.mixins.json'
+}
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.release = 17
+}
+tasks.named('processResources') {
+    dependsOn compileJava
+    from(layout.buildDirectory.file('tmp/compileJava/compileJava-refmap.json')) { rename { 'spawnselector.refmap.json' } }
+    inputs.property 'version', project.version
+    filesMatching('META-INF/mods.toml') { expand version: project.version }
+}
+tasks.named('jar', Jar) {
+    from('LICENSE') { into 'META-INF' }
+    from('NOTICE.md') { into 'META-INF' }
+    from('LICENSES') { into 'META-INF/LICENSES' }
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    archiveFileName = "spawnselector-${version}-forge-${minecraft_version}-thin.jar"
+    manifest.attributes('MixinConfigs': 'spawnselector.mixins.json', 'FMLModType': 'MOD',
+        'Implementation-Version': project.version)
+    finalizedBy 'reobfJar'
+}
+tasks.register('devJar', Jar) {
+    from('LICENSE') { into 'META-INF' }
+    from('NOTICE.md') { into 'META-INF' }
+    from('LICENSES') { into 'META-INF/LICENSES' }
+    dependsOn classes, 'jarJar'
+    from({ zipTree(tasks.jarJar.archiveFile.get().asFile) }) { include 'META-INF/jarjar/**' }
+    archiveClassifier = 'dev'
+    from sourceSets.main.output
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    manifest.attributes('MixinConfigs': 'spawnselector.mixins.json', 'FMLModType': 'MOD')
+}
+tasks.named('jarJar', Jar) {
+    from('LICENSE') { into 'META-INF' }
+    from('NOTICE.md') { into 'META-INF' }
+    from('LICENSES') { into 'META-INF/LICENSES' }
+    archiveFileName = "spawnselector-${version}-forge-${minecraft_version}.jar"
+    manifest.attributes('MixinConfigs': 'spawnselector.mixins.json', 'FMLModType': 'MOD', 'Implementation-Version': project.version)
+    finalizedBy 'reobfJarJar'
+}
+tasks.register('perimeterTest', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'PerimeterTest'
+}
+sourceSets.test.java { srcDir 'tests'; exclude 'runtime/**', 'world/**' }
+tasks.named('check') { dependsOn 'perimeterTest' }
+tasks.register('capacityTest', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'CapacityTest'
+}
+tasks.named('check') { dependsOn 'capacityTest' }
+tasks.register('savedDataTest', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'dev.tide.spawnselector.SavedDataTest'
+}
+tasks.named('check') { dependsOn 'savedDataTest' }
+
+tasks.register('originsCompatTest', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'OriginsCompatTest'
+}
+tasks.named('check') { dependsOn 'originsCompatTest' }
+
+tasks.register('localizationTest', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'dev.tide.spawnselector.LocalizationTest'
+    args project.file('src/main/resources').absolutePath
+}
+tasks.named('check') { dependsOn 'localizationTest' }
+
+tasks.register('configFilesTest', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'dev.tide.spawnselector.ConfigFilesTest'
+    args project.layout.buildDirectory.dir('tmp/config-tests').get().asFile.absolutePath, project.file('src/main/resources').absolutePath
+}
+tasks.named('check') { dependsOn 'configFilesTest' }
+tasks.register('holdingRecoveryFixture', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'HoldingRecoveryFixture'
+    args project.file("run/client/saves/${project.findProperty('testWorld') ?: 'spawnselector-final-body-check'}").absolutePath
+}
+tasks.named('build') { dependsOn 'devJar' }
+
+tasks.register('linkageAudit', JavaExec) {
+    dependsOn testClasses, devJar
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'LinkageAudit'
+    doFirst {
+        def paths = [tasks.devJar.archiveFile.get().asFile] + configurations.compileClasspath.files.findAll { it.name.endsWith('.jar') }
+        def list = layout.buildDirectory.file('dev-audit-paths.txt').get().asFile
+        list.text = paths.collect { it.absolutePath }.join('\n')
+        args list.absolutePath
+    }
+}
+tasks.register('productionLinkageAudit', JavaExec) {
+    dependsOn testClasses, 'reobfJarJar'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'LinkageAudit'
+    doFirst {
+        def forgeSrg = forgeSrgArtifact()
+        def paths = [tasks.jarJar.archiveFile.get().asFile, forgeSrg] + configurations.compileClasspath.files.findAll { it.name.endsWith('.jar') }
+        def list = layout.buildDirectory.file('production-audit-paths.txt').get().asFile
+        list.text = paths.collect { it.absolutePath }.join('\n')
+        args list.absolutePath
+    }
+}
+tasks.named('check') { dependsOn 'productionLinkageAudit' }
+tasks.register('verifyArtifacts', Exec) {
+    dependsOn 'reobfJarJar', 'devJar'
+    commandLine pythonExecutable.get(), 'tools/verify_artifacts.py', tasks.jarJar.archiveFile.get().asFile, tasks.devJar.archiveFile.get().asFile
+}
+tasks.named('check') { dependsOn 'linkageAudit', 'verifyArtifacts' }
+tasks.register('prepareProductionRuntime') {
+    dependsOn 'reobfJarJar'
+    doLast {
+        def userdev = net.minecraftforge.gradle.common.util.MavenArtifactDownloader.download(project,
+            "net.minecraftforge:forge:${minecraft_version}-${forge_version}:userdev", false)
+        if (userdev == null) throw new GradleException('ForgeGradle userdev metadata is unavailable')
+        def metadata = new groovy.json.JsonSlurper().parseText(new String(
+            net.minecraftforge.gradle.common.util.Utils.getZipData(userdev, 'config.json'), 'UTF-8'))
+        def resolved = configurations.runtimeClasspath.resolvedConfiguration.resolvedArtifacts
+        def modulePaths = metadata.modules.collect { coordinate ->
+            def match = resolved.find { it.moduleVersion.id.toString() == coordinate }
+            if (match == null) throw new GradleException("Runtime module missing: ${coordinate}")
+            match.file.absolutePath
+        }
+        def runtime = configurations.runtimeClasspath.files.findAll {
+            !it.name.startsWith("forge-${minecraft_version}-${forge_version}") && !it.name.startsWith('mixinextras-')
+        }
+        def paths = ([forgeSrgArtifact()] + runtime).collect { it.absolutePath }.unique()
+        def javaHome = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(17) }.get().metadata.installationPath.asFile
+        def config = [classpath: paths, modules: modulePaths, javaHome: javaHome.absolutePath,
+            jvmArgs: metadata.runs.server.jvmArgs, properties: metadata.runs.server.props,
+            forgeVersion: forge_version, minecraftVersion: minecraft_version,
+            mcpVersion: metadata.mcp.split(':')[2].split('@')[0].substring(minecraft_version.length() + 1),
+            productionJar: tasks.jarJar.archiveFile.get().asFile.absolutePath]
+        def output = layout.buildDirectory.file('production-runtime.json').get().asFile
+        output.parentFile.mkdirs()
+        output.setText(groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(config)), 'UTF-8')
+    }
+}
+
+tasks.register('productionMixinSmoke', Exec) {
+    dependsOn 'prepareProductionRuntime'
+    commandLine pythonExecutable.get(), 'runtime_test.py', layout.buildDirectory.file('production-runtime.json').get().asFile
+}
+tasks.matching { it.name == 'runClient' }.configureEach {
+        if(project.hasProperty('clientRegression')) doLast {
+            def scenario=project.property('clientRegression')
+            def log=file('run/client/logs/latest.log').getText('UTF-8')
+            if(!log.contains("CLIENT_REGRESSION PASS scenario=${scenario}") || log.contains('CLIENT_REGRESSION FAIL'))
+                throw new GradleException("Client regression ${scenario} failed; see run/client/logs/latest.log")
+        }
+    }

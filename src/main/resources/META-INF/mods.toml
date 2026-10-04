@@ -1,0 +1,20 @@
+modLoader="javafml"
+loaderVersion="[47,)"
+license="AGPL-3.0-only"
+[[mods]]
+modId="spawnselector"
+version="${version}"
+displayName="SpawnSelector"
+description='''Configurable per-player structure spawn selection, bounded discovery and safe outside spawning. Supports optional Origins compatibility.'''
+[[dependencies.spawnselector]]
+modId="forge"
+mandatory=true
+versionRange="[47.4.0,48)"
+ordering="NONE"
+side="BOTH"
+[[dependencies.spawnselector]]
+modId="minecraft"
+mandatory=true
+versionRange="[1.20.1,1.20.2)"
+ordering="NONE"
+side="BOTH"

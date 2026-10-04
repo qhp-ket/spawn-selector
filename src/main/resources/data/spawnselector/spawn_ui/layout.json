@@ -1,0 +1,32 @@
+{
+  "entries_per_page": 4,
+  "panel_width": 420,
+  "card_height": 24,
+  "show_icons": true,
+  "show_previews": false,
+  "preview_width": 128,
+  "preview_height": 72,
+  "allow_permanent_skip": true,
+  "title": {
+    "color": "gold",
+    "translate": "spawnselector.ui.title"
+  },
+  "confirm_label": {
+    "translate": "spawnselector.ui.confirm"
+  },
+  "back_label": {
+    "translate": "spawnselector.ui.back"
+  },
+  "skip_label": {
+    "color": "red",
+    "translate": "spawnselector.ui.skip"
+  },
+  "empty_message": {
+    "color": "red",
+    "translate": "spawnselector.ui.empty"
+  },
+  "footer": {
+    "color": "gray",
+    "translate": "spawnselector.ui.footer"
+  }
+}

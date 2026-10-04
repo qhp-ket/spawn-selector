@@ -1,0 +1,27 @@
+{
+  "name": {
+    "color": "white",
+    "translate": "spawnselector.entry.village.name"
+  },
+  "description": [
+    {
+      "color": "white",
+      "translate": "spawnselector.entry.village.description"
+    }
+  ],
+  "icon": "minecraft:emerald",
+  "dimension": "minecraft:overworld",
+  "locator": "minecraft_structure",
+  "target": "#minecraft:village",
+  "order": 10,
+  "enabled": true,
+  "search_radius": 64,
+  "min_distance": 8,
+  "max_distance": 48,
+  "preferred_side": "north",
+  "required_mod": "",
+  "candidate_count": 3,
+  "capacity_per_instance": -1,
+  "require_open_sky": true,
+  "exclusions": []
+}

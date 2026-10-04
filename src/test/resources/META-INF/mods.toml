@@ -1,0 +1,13 @@
+modLoader="javafml"
+loaderVersion="[47,)"
+license="AGPL-3.0-only"
+[[mods]]
+modId="spawnselectortests"
+version="1.0"
+displayName="Spawn Selector isolated regression tests"
+[[dependencies.spawnselectortests]]
+modId="spawnselector"
+mandatory=true
+versionRange="[2.1.0,)"
+ordering="AFTER"
+side="BOTH"
