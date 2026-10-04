@@ -25,3 +25,6 @@ reference/
 *.hprof
 .env
 .env.*
+/AGENTS.md
+/docs/history/
+/docs/VALIDATION*.md
