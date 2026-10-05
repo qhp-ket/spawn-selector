@@ -11,7 +11,57 @@ public final class SavedDataTest {
         var constructor=PlayerSelections.class.getDeclaredConstructor(CompoundTag.class);
         constructor.setAccessible(true); return constructor.newInstance(tag);
     }
+    static SpawnEntry poolEntry(int count, int capacity) {
+        var json=com.google.gson.JsonParser.parseString("{\"locator\":\"minecraft_structure\",\"target\":\"#minecraft:village\"}").getAsJsonObject();
+        json.addProperty("candidate_count",count);
+        json.addProperty("capacity_per_instance",capacity);
+        return SpawnEntry.parse(new net.minecraft.resources.ResourceLocation("spawnselector:village"),json);
+    }
+    static void candidateAvailability() throws Exception {
+        for(int capacity:List.of(1,2)) {
+            var original=poolEntry(5,capacity);
+            ListTag instances=new ListTag();
+            for(int i=0;i<5;i++) {
+                var id=new StructureInstanceId("minecraft:overworld","minecraft:village_plains",i,0);
+                CompoundTag candidate=StructureCandidatePool.identity(id);
+                candidate.putString("state","READY"); candidate.putInt("capacity",capacity);
+                ListTag targets=new ListTag(); targets.add(StringTag.valueOf(StructureCandidatePool.target(original)));
+                candidate.put("targets",targets);
+                ListTag claims=new ListTag();
+                if(i<2) for(int slot=0;slot<capacity;slot++) {
+                    CompoundTag claim=new CompoundTag(); claim.putUUID("player",new UUID(i+1,slot+1));
+                    claim.putBoolean("completed",true); claims.add(claim);
+                }
+                candidate.put("claims",claims); instances.add(candidate);
+            }
+            CompoundTag root=new CompoundTag(), poolTag=new CompoundTag();
+            root.putInt("schema_version",2); poolTag.put("instances",instances); root.put("candidate_pool",poolTag);
+            // Exercise the real SavedData load/save/load path, including permanent claims and order.
+            var pool=load(load(root).save(new CompoundTag())).pool;
+            var reduced=poolEntry(2,capacity);
+            var eligible=pool.all(reduced); // Fixture contains only this target's valid structure IDs.
+            check(eligible.size()==5,"Reducing count preserves historical instances");
+            check(eligible.get(0).claims.size()==capacity && eligible.get(1).claims.size()==capacity,
+                "Completed claims keep the leading instances full after reload");
+            check(pool.availableFromEligible(eligible,original).equals(eligible.subList(2,5)),
+                "Unchanged count returns all three available instances");
+            check(pool.availableFromEligible(eligible,reduced).equals(eligible.subList(2,4)),
+                "Reducing count from five to two skips full A/B and returns C/D");
+            eligible.get(2).state=StructureCandidatePool.State.FAILED;
+            check(pool.availableFromEligible(eligible,reduced).equals(eligible.subList(3,5)),
+                "Failed C does not consume a returned candidate slot");
+            eligible.get(3).state=StructureCandidatePool.State.FAILED;
+            check(pool.availableFromEligible(eligible,reduced).equals(List.of(eligible.get(4))),
+                "Fewer available instances returns the remaining E");
+            eligible.get(4).state=StructureCandidatePool.State.FAILED;
+            check(pool.availableFromEligible(eligible,reduced).isEmpty(),"Full or failed pool returns empty");
+            check(pool.availableFromEligible(eligible,poolEntry(2,-1)).equals(eligible.subList(0,2)),
+                "Unlimited capacity permits populated A/B but still excludes failed instances and limits count");
+            check(pool.availableFromEligible(List.of(),reduced).isEmpty(),"Empty eligible pool remains empty");
+        }
+    }
     public static void main(String[] args) throws Exception {
+        candidateAvailability();
         UUID alice=UUID.randomUUID(), bob=UUID.randomUUID();
         CompoundTag legacy=new CompoundTag(), players=new CompoundTag(), record=new CompoundTag();
         record.putString("entry","spawnselector:village"); record.putString("dimension","minecraft:overworld");
@@ -59,6 +109,6 @@ public final class SavedDataTest {
         current.putInt("schema_version",999);
         try { load(current); throw new AssertionError("Future schema must be protected"); }
         catch(java.lang.reflect.InvocationTargetException ex) { check(ex.getCause() instanceof UnsupportedOperationException,"Future schema is disabled safely by get()"); }
-        System.out.println("PASS: real NBT legacy upgrade, player state, candidate persistence, interrupted reservation recovery, future-schema guard");
+        System.out.println("PASS: real NBT legacy upgrade, player state, candidate persistence, reduced-count availability, interrupted reservation recovery, future-schema guard");
     }
 }

@@ -61,8 +61,14 @@ public final class StructureCandidatePool {
         return candidates.values().stream().filter(c -> c.targets.contains(target(entry))).toList();
     }
     List<Candidate> available(MinecraftServer server, SpawnEntry entry) {
-        return eligible(server,entry).stream().limit(entry.candidateCount())
-            .filter(c -> c.state != State.FAILED && c.claims.hasRoom(effectiveCapacity(c, entry))).toList();
+        return availableFromEligible(eligible(server, entry), entry);
+    }
+    // Shares selection policy with headless persistence tests; live callers resolve on the server thread.
+    List<Candidate> availableFromEligible(List<Candidate> eligible, SpawnEntry entry) {
+        // Reload can reduce the limit below the number of persisted candidates.
+        return eligible.stream()
+            .filter(c -> c.state != State.FAILED && c.claims.hasRoom(effectiveCapacity(c, entry)))
+            .limit(entry.candidateCount()).toList();
     }
     List<Candidate> eligible(MinecraftServer server, SpawnEntry entry) {
         thread(server);
